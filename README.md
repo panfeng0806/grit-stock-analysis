@@ -1,151 +1,178 @@
-# GRIT 五要素股票研究 Skill
+# GRIT 五要素股票研究
 
-> 为 [Hermes Agent](https://hermes-agent.nousresearch.com) 打造的专业股票投研技能包
+> AI Agent 通用投研技能包 — 让任何 AI Agent 都能产出研报级别的股票分析
 >
-> **当前版本：v1.5** · 2026-05-06 实战校准
+> **v1.5** · 2026-05-06 实战校准 · 安克创新 300866.SZ 全流程验证
 
 ---
 
-## 这是什么？
+## 这是什么
 
-**GRIT**（Growth · Risk · Industry · moaT · valuaTion）是一套五要素股票研究框架。它将研报级别的投研流程封装为 Hermes Agent 的一个可复用技能，让 AI 自主完成：
+**GRIT**（Growth · Risk · Industry · moaT · valuaTion）是一套五要素股票研究框架。它本质上是一个**给 AI Agent 看的提示词工程包**——定义了一套 agent 在分析股票时必须遵循的方法论、数据流和硬约束。
 
-1. 📂 **资料索引与扫描** — 地毯式读取 Wind 财报 Excel、年报 PDF、券商研报、高临纪要
-2. 🔍 **深度数据提取** — 财务追踪、业务结构、管理层、行业竞争、重大事件
-3. 📊 **五要素分析** — 增长质量 / 风险矩阵 / 产业格局 / 护城河 / 估值定位
-4. 📝 **结构化研报输出** — GRIT 标准模板，可追溯、可审计、无幻觉
+它不是脚本，不是 API，是一个 **Skill**：告诉 AI Agent 怎么读资料、怎么推理、怎么写报告。
+
+### AI Agent 拿到它之后能干什么
+
+1. 扫描 `raw/` 文件夹里的 Wind 财务 Excel、年报 PDF、券商研报、行业纪要
+2. 地毯式提取结构化数据，生成 `extracted.md`
+3. 按五要素（增长/风险/产业/护城河/估值）逐一深度分析
+4. 输出一份可追溯、无幻觉、格式统一的研报级 `report.md`
 
 ---
 
-## 安装
+## 适用平台
+
+这不是某个特定 agent 的插件。只要 AI agent **能读文件 + 能执行命令**，它就能用 GRIT：
+
+| 平台 | 用法 |
+|:---|:---|
+| [Hermes Agent](https://hermes-agent.nousresearch.com) | `hermes skill install grit-stock-analysis/` |
+| [OpenClaw](https://github.com/nicholasgriffintn/openclaw) | 放入 workspace skills 目录 |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | 放入 `.claude/skills/` 或直接 `/add-dir` |
+| [OpenAI Codex](https://github.com/openai/codex) | 放入项目 `.codex/skills/` |
+| [OpenCode](https://github.com/sst/opencode) | 放入 workspace，prompt 中引用 |
+| 任何通用 LLM Agent | 把 SKILL.md + references 作为 system prompt 注入 |
+
+> 核心交互协议在各平台都一样：agent 看到「分析 XXX 股票」→ 加载 GRIT skill → 走 6 阶段流水线。
+
+---
+
+## 快速开始
 
 ```bash
-# 1. 解密（需要密码，联系分享者获取）
+# 1. 解密（需要密码）
 age -d grit-v1.5.tar.gz.age | tar xz
 
-# 2. 安装到 Hermes
-hermes skill install grit-stock-analysis/
+# 2. 放入你的 AI Agent 的 skills/workspace 目录
+cp -r grit-stock-analysis/ ~/.hermes/skills/research/     # Hermes
+# 或
+cp -r grit-stock-analysis/ ~/.openclaw/skills/             # OpenClaw
+# 或
+cp -r grit-stock-analysis/ ~/.claude/skills/               # Claude Code
+# 或任何你的 agent 读取 skill 的路径
 
-# 3. 首次使用需安装 openpyxl（用于读取 Wind Excel）
+# 3. 安装 pdftotext（几乎所有平台的 agent 都用到）
+# macOS:  brew install poppler
+# Linux:  apt install poppler-utils
+# Win:    https://github.com/oschwartz10612/poppler-windows
+
+# 4. 如果 raw/ 里有 Excel，agent 首次运行时需安装
 pip install openpyxl --break-system-packages
 ```
 
-> **依赖**：需要安装 `pdftotext`（apt install poppler-utils），用于提取 PDF 中的券商研报文本。
-
 ---
 
-## 使用
+## 你需要准备的资料
 
-在 Hermes Agent 对话中直接说：
-
-```
-分析一下安克创新 300866
-跑一下 GRIT 格力电器
-帮我看看宁德时代
-```
-
-AI 会按以下阶段推进：
-
-| 阶段 | 步骤 | 说明 |
-|:---|:---|:---|
-| 0 | 创建文件夹 + 输出资料清单 | 告诉你要准备哪些资料 |
-| 1 | 用户放入 raw/ → 扫描 | 生成覆盖-缺口矩阵 |
-| 2 | 全部阅读 + 结构化提取 | 产出 extracted.md |
-| 3 | 构建五要素分析 | 核心分析段落 |
-| 4 | 生成完整报告 | report.md |
-| 5 | 全面质量校验 | 6 大类 20+ 检查项 |
-
-> 完整交互协议见 SKILL.md →「交互模式速查」。
-
----
-
-## 你需要准备的原始资料
-
-放入 `raw/` 文件夹：
+扔进 `raw/` 文件夹：
 
 ```
 raw/
-├── Wind财务摘要.xlsx          # Wind/Choice 导出的财务Excel
+├── Wind财务摘要.xlsx          #   Wind/Choice 导出的财务数据
 ├── 竞争对手/
-│   ├── 绿联科技.xlsx           # 可比公司Wind Excel
-│   └── 传音控股.xlsx
+│   ├── 绿联科技.xlsx           # 可比公司（用于估值对比）
+│   └── ...
 ├── 年报/
 │   ├── 2024年报.pdf
-│   └── 2025年报.pdf
-├── 券商研报/                   # 支持中英文PDF
+│   └── 2025年报.pdf            # 最新年度报告
+├── 季报/
+│   └── 2026Q1报告.pdf          # 有最新季报务必放入
+├── 券商研报/                   # 中英文 PDF 都支持
 │   ├── 信达证券-深度报告.pdf
 │   └── UBS-Company_Note.pdf
-├── 高临纪要/                   # 行业专家访谈
-└── 问财-行业数据.txt            # 可选：问财OpenAPI数据
+├── 高临纪要/                   # 专家访谈、行业会议纪要
+└── 问财-行业数据.txt            # 可选：同花顺问财 OpenAPI 数据
 ```
 
->  没有券商研报也能跑，但深度会打折扣。最少需要 **Wind 财务摘要 Excel**。
+> 最少需要一份 **Wind 财务摘要 Excel**。资料越全，报告越深。
 
 ---
 
-## v1.5 重大更新（2026-05-06）
+## 交互流程
 
-基于安克创新（300866.SZ）全流程实战校准，新增 7 条硬约束：
+Agent 拿到这个 skill 后会按 6 个阶段走：
 
-| # | 规则 | 解决的问题 |
+| 阶段 | 做什么 | 产出 |
+|:---|:---|:---|
+| 0 | 创建文件夹 + 输出资料需求清单 | 告诉你要准备什么 |
+| 1 | 扫描 raw/，生成覆盖-缺口矩阵 | 让你知道缺什么 |
+| 2 | 全量读取所有文件，结构化提取 | `extracted.md` |
+| 3 | 构建五要素分析段落 | 核心分析 |
+| 4 | 拼接 GRIT 标准模板 | `report.md` |
+| 5 | 6 大类 20+ 项质量校验 | 无遗漏、无矛盾 |
+| 6 | 最终交付 | 完整研报 + 数据来源清单 |
+
+---
+
+## v1.5 更新（2026-05-06）
+
+基于安克创新 300866.SZ 全流程实战后的校准。
+
+**核心教训：三个字——偷懒、不统一、不推算**
+
+| # | 硬约束 | 踩过的坑 |
 |:---:|:---|:---|
-| 14 | 禁止删除模板任何维度 | 「净利环比」被无故删除 |
-| 15 | PE-TTM 自算且全文唯一 | 报告出现 34.97/23.81/25.9 三个矛盾值 |
-| 16 | 推算 > 提取 > 标注 > 「未识别」 | 期间费用率明明可推算却被标「未识别」 |
-| 17 | EPS/市值统一量纲 | 券商预测用 EPS，内部用市值，无法对话 |
-| 18 | 增长类型全量罗列 | 只列匹配的，遗漏减速信号 |
-| 19 | 季度表必须覆盖最新报告期 | Q1 2026 季报被忽略 |
-| 20 | 支持问财 OpenAPI 补充 | 管理层/行业数据可从问财实时获取 |
+| 14 | 禁止删除模板任何维度 | 季度表莫名少了「净利环比」行 |
+| 15 | PE-TTM 必须自算且全文唯一 | 报告出现 34.97 / 23.81 / 25.9 三个矛盾值 |
+| 16 | 推算 > 提取 > 标注 > 最后才「未识别」 | 期间费用率明明可算却标未识别 |
+| 17 | EPS 与市值统一量纲 | 券商预测 EPS，内部算市值，无法对话 |
+| 18 | 增长类型全量罗列 | AI 自作主张只列匹配的，掩盖了减速信号 |
+| 19 | 季度表必须覆盖最新报告期 | Q1 2026 季报静静躺在 raw 里被忽略了 |
+| 20 | 支持问财 OpenAPI 补充查询 | 管理层/行业数据 raw 里没有，但 API 有 |
 
-> 完整 changelog 见 SKILL.md 末尾 Pitfalls 14-20。
+> 完整细则见 `grit-stock-analysis/SKILL.md` 末尾 Pitfalls 14-20。
 
 ---
 
-## 技术细节
-
-### 核心文件
+## 文件结构
 
 ```
 grit-stock-analysis/
-├── SKILL.md                                    # 主技能文件（Agent 行为定义）
+├── SKILL.md                                    # 主文件：Agent 行为全定义
 └── references/
-    ├── GRIT模板-五要素股票AI研究提示词-v1.34.md   # 报告模板
-    ├── HARNESS-股票研究执行框架-v1.34.md          # 执行框架
-    ├── wind-excel-structure.md                  # Wind Excel 行号映射
-    └── real-time-data-sources.md                # 实时数据源（股价/估值）
+    ├── GRIT模板-...-v1.34.md                    # 研报标准模板
+    ├── HARNESS-...-v1.34.md                     # 执行框架（6阶段流水线）
+    ├── wind-excel-structure.md                  # Wind Excel 行号映射（别漏关键比率）
+    └── real-time-data-sources.md                # 实时股价/估值数据源
 ```
 
-### 防止幻觉的关键设计
+---
 
-- **单向流水线**：raw → extracted → report，禁止跳过中间步骤
-- **原始引用可追溯**：所有数据标注来源文件、行号、时点
-- **缺失显式标注**：无数据标「未识别」而非编造（v1.5 后改为「推算值」优先）
-- **20 条硬约束**：从实战踩坑提炼的不可违反规则
+## 设计原则
+
+**「不是给 AI 编规则，是让 AI 学会像分析师一样思考」**
+
+- **单向流水线**：raw → extracted → report，跳过任何步骤都会导致幻觉
+- **数据可追溯**：每个数字标注来源文件、行号、时点
+- **缺则标注**：无数据标「未识别」或「推算值」，绝不编造
+- **硬约束优先**：20 条从实战踩坑提炼的不可违反规则，优先级高于 AI 的自主判断
+- **平台无关**：任何能读文件 + 执行命令的 AI Agent 都能用
 
 ---
 
 ## FAQ
 
 **Q: 为什么加密分发？**
-A: 这是专业投研工具，限内部使用。加密确保只有授权人员可以获取。
+A: 专业投研工具，限授权人员使用。
 
-**Q: 支持 A 股以外的市场吗？**
-A: 当前框架为 A 股设计（Wind 财务 Excel 格式），港股/美股需要适配数据源格式。
-
-**Q: 对 AI 模型有要求吗？**
-A: 需要具备 128K+ 上下文窗口的模型（报告常达 800+ 行）。推荐 Claude Sonnet 4、DeepSeek V3/R1。
+**Q: 需要什么 AI 模型？**
+A: 推荐 128K+ 上下文窗口（报告常达 800+ 行）。Claude Sonnet 4、Gemini 2.5 Pro、DeepSeek V3/R1 都跑过，没问题。
 
 **Q: 没有 Wind 账号怎么办？**
-A: 可以手工作一份 CSV（收入/成本/利润/现金流/关键比率），放入 raw/ 即可。
+A: 手工整理一份 CSV（营收/成本/利润/现金流/关键比率），格式对齐 Wind 导出行号即可。
+
+**Q: 能用于港股/美股吗？**
+A: 框架是市场无关的，但 references 里的 Excel 行号映射是为 A 股 Wind 格式写的。港股/美股需要适配数据源格式。
 
 ---
 
 ## License
 
-内部使用 · 禁止外传
+内部授权使用 · 禁止外传
 
 ---
 
 <p align="center">
-  <sub>Built with Hermes Agent · GRIT Framework v1.5</sub>
+  <sub>Agent-agnostic · GRIT Framework v1.5 · 2026</sub>
 </p>
