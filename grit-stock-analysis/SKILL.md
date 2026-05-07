@@ -1,7 +1,7 @@
 ---
 name: grit-stock-analysis
 description: Execute GRIT five-factor stock research pipeline. Creates stock folder, guides user through manual raw data collection, then runs the full HARNESS framework to produce a complete investment research report. Trigger when user requests stock analysis, asks to "跑一下GRIT", or mentions a stock they want to research.
-version: 1.7
+version: 2.0
 ---
 
 # GRIT 五要素股票研究 Skill
@@ -23,7 +23,11 @@ version: 1.7
 Skill 内部已含核心文件（无需额外加载）：
 - `references/HARNESS-股票研究执行框架-v1.35.md` — 执行框架
 - `references/GRIT模板-五要素股票AI研究提示词-v1.35.md` — 报告模板
-- `references/wind-excel-structure.md` — Wind/Choice Excel行区块结构（防止漏读关键比率）
+- `references/wind-excel-structure.md` — Wind/Choice Excel行区块结构
+- `references/non-a-share-data-sources.md` — 非A股实时数据源
+- `references/market-a-share.md` — **A股市场参考**（数据源/Excel结构/问财API）
+- `references/market-us.md` — **美股市场参考**（SEC章节导航/20-F提取/Yahoo Finance）
+- `references/formulas.md` — **衍生指标自动计算公式**（消灭"待查"）
 
 ---
 
@@ -42,6 +46,19 @@ Skill 内部已含核心文件（无需额外加载）：
 用户说「我想分析XXX股票，代码YYY」或「跑一下GRIT：XXX（代码）」
 
 ### 步骤
+
+#### 0.0 市场检测（v2.0新增）
+
+**在创建文件夹前，先判定标的所属市场**，以便加载对应参考文件：
+
+| 特征 | 市场 | 加载文件 | 关键差异 |
+|:---|:---|:---|:---|
+| 代码为纯数字（600519/000858）或用户说"分析A股" | **A 股** | `references/market-a-share.md` | Wind Excel/东方财富API/问财 |
+| 代码含字母（FUFU/AAPL/TSLA）或 raw/ 中有 20-F/10-K | **美股** | `references/market-us.md` | SEC章节导航/Yahoo Finance/CoinGecko |
+| 代码为5位数字（00700）或 .HK 后缀 | **港股** | `references/market-hk.md`（预留） | 港交所披露易 |
+| 用户明确指定市场 | **按指定** | — | — |
+
+⚠️ **判定后立即用 skill_view 加载市场参考文件**，后续各阶段按市场特化流程执行。
 
 #### 0.1 创建项目文件夹
 
@@ -84,6 +101,7 @@ mkdir -p "~/grit/analysis/{股票名称}（{股票代码}）/raw"
 3. 回来告诉我「资料已放好，开始分析」
 
 > 💡 资料越全，报告质量越高。实在找不到的我会标注"未识别"，不影响出报告。
+> 📄 **文件格式偏好**：PDF > Word。PDF 可直接 pdftotext+grep 搜索，Word 需要额外的 python-docx 或 pandoc 转换环节。年报/研报/公告原始就是 PDF，直接扔进来最省事。扫描版 PDF（图片型）需要 OCR，电子版 PDF 无障碍。
 ```
 
 #### 0.3 等待用户确认
@@ -181,8 +199,8 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 | 文档类型 | 检索重点 |
 |---------|---------|
 | Excel | ⚠️ **全量读取：从第1行到 `ws.max_row`**。Wind/Choice导出的财务摘要Excel通常80-90行，关键数据分散在多个区块：利润表摘要（行5-20）→ 资产负债表摘要（行22-40）→ 现金流量表摘要（行42-55）→ **关键比率**（行57-70，含ROE/ROIC/毛利率/净利率/资产负债率/资产周转率/现净比）→ 每股指标（行72-85）。**切勿只读前30行就判定数据缺失！** 尤其「关键比率」区块包含ROIC、季度毛利率、季度净利率等GRIT模板必需指标 |
-| PDF年报 | 财务报表、管理层讨论、业务回顾、风险提示、附注 |
-| PDF研报 | 盈利预测、目标价、行业数据、数据截止日期 |
+| PDF年报 | 财务报表、管理层讨论、业务回顾、风险提示、附注。**先 pdftotext，失败则 OCR 兜底** |
+| PDF研报 | 盈利预测、目标价、行业数据、数据截止日期。**先 pdftotext，失败则 OCR 兜底** |
 | 纪要/访谈 | 括号补充说明、不确定信息标记、后续跟进事项 |
 
 **维度二：隐性信息识别（按业务归类）**
@@ -386,7 +404,9 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 - [ ] 财务数据标注Excel位置？
 - [ ] 市场数据为实时抓取？
 - [ ] 预测数据标注假设？
-- [ ] 无素材处标注"未识别"？
+- [ ] **年报暗线已全量提取**（Item 6高管/Item 7股东/Item 4融资/F-pages BS）？（v1.11）
+- [ ] **股权激励论述达投研深度**（激励池/归属率/SBC费/高管分拆/对价）？（v1.11）
+- [ ] **可推算指标已全部自算**（ROE/ROIC/PB/EV/EBITDA/费用率），无残余「待查」？（v1.11）
 
 #### 深度分析质量
 - [ ] 每业务产业逻辑≥200字且有证据？
@@ -480,14 +500,25 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 1. **不要直接复制raw文件内容到report** — raw → extracted → report 是单向流水线
 2. **实时市场数据必须抓取** — 股价/PE/市值禁止使用raw中历史数据，用web_search或API。详见 `references/real-time-data-sources.md`
 3. **延伸关注标的只能来自raw** — 禁止从脑海中编造股票代码
-4. **openpyxl 依赖** — 读取Excel需先安装 `pip install openpyxl --break-system-packages`，阶段2扫描Excel前先检查是否已安装，未安装则自动安装（1秒内完成）
+4. **openpyxl 依赖** — 读取Excel需先安装 `pip install openpyxl --break-system-packages`，阶段2扫描Excel前先检查是否已安装，未安装则自动安装（1秒内完成）。⚠️ 若 openpyxl 因科学计数法等格式问题报错（如 `ValueError: invalid literal for int() with base 10: '805.059...'`），立即切换到 **python-calamine**：`pip install python-calamine --break-system-packages`，然后用 `pd.read_excel(..., engine='calamine', sheet_name=None)` 读取。calamine 对格式问题容忍度更高，实测可读取 Wind/Choice 导出的所有 sheet。
 5. **raw/ 支持子文件夹组织** — 用户可按类型建子目录（如 券商研报/、年报/、高临纪要/），`find` 递归扫描支持。Phase 0.2 的指引文案无需阻止子目录
 6. **财务数据Excel优先** — 年报PDF只是补充，Excel数据更准
 7. **季度数据缺失是常态** — 没有就标"季度数据缺失，仅基于年度数据判断"，不要编造
 8. **用户可能跨session操作** — 每次续作先读 extracted.md 和 raw/ 文件列表恢复上下文
 9. **🔴 Excel必须全量读取** — Wind/Choice导出的财务摘要Excel通常80-90行，前30行（利润表+资产负债表）之后还有现金流量表摘要和**关键比率**区块（ROE/ROIC/毛利率/净利率/资产负债率/周转率/现净比/季度数据/PE/PB/PS）。永远用 `max_row` → `for row in ws.iter_rows(min_row=1, max_row=ws.max_row)` 读到末尾，切勿中途截断后判定"数据缺失"。这是本次安克创新分析中实际踩过的坑——前30行看似只有营收/净利/资产，但关键比率全在50-87行。详见 `references/wind-excel-structure.md`
 10. **🔴 Excel PE ≠ 实时PE** — Wind Excel底部估值指标（P/E TTM/PB/PS）基于Wind数据导出时的股价快照，可能与当前实时股价偏离。报告中应优先使用实时API抓取的估值数据，Excel估值指标仅供竞争对比时参考（因竞争对手同一快照时点，相对可比性仍有效）。报告中需标注数据时点差异。
-11. **🔴 所有PDF券商报告必须先pdftotext再grep** — 每次执行阶段2时，所有raw/券商研报/下的PDF（含中英文学）都必须：①`pdftotext -layout` 提取全文到临时文件；②`grep -i '市场规模\|CAGR\|亿美\|market size\|target price\|EPS\|revenue.*20'` 搜索关键行业/估值数据。海外投行报告（BofA/UBS等）通常含精确EPS预测和目标价演进，国内券商深度报告常含招股书引用的第三方行业数据（如弗若斯特沙利文表）。切勿因为「已经有几份中文报告了」就跳过英文PDF或「封面看起来像重复内容」的PDF。
+11. **🔴 所有PDF券商报告必须先pdftotext再grep，年报要读到Item级别** — 每次执行阶段2时，所有raw/下的PDF（含中英文学）都必须提取。分两类处理：
+
+    **券商研报**（券商报告/Seeking Alpha/投行等）：①`pdftotext -layout` 提取全文到临时文件；②`grep -i '市场规模\|CAGR\|亿美\|market size\|target price\|EPS\|revenue.*20'` 搜索关键行业/估值数据。海外投行报告（BofA/UBS等）通常含精确EPS预测和目标价演进，国内券商深度报告常含招股书引用的第三方行业数据（如弗若斯特沙利文表）。
+
+    **SEC年报/公告**（20-F/10-K/6-K等）：年报不仅是财务数据的备份——Excel已经有了利润表，但年报正文有大量Excel里没有的结构化信息，必须逐Item提取：
+    - **Item 6**：董事/高管姓名、年龄、履历、薪酬、股权激励明细（授予股数/归属条件/时间）
+    - **Item 7**：前十大股东/主要股东持股明细（股数/比例/投票权/身份），关联交易
+    - **Item 4.A**：公司历史与SPAC/IPO交易结构、PIPE融资条款、融资轮次
+    - **Item 5.B**：流动性分析、ATM计划、F-3储架状态
+    - **F-pages**：审计后资产负债表（完整的FY2025数据，Excel通常只到FY2024）
+
+    切勿因为「财报数据Excel里都有」就跳过20-F正文。这是本次FUFU分析中实际踩过的坑——年报里董事长/股东/融资/股权激励全在，却全标了「未识别」或「待查」，被老板当面指出。
 12. **🔴 竞争对手Excel也要读到底** — 绿联/传音/华宝等可比公司的Wind Excel同样在底部「关键比率」行含PE-TTM/PB/PS估值指标。读完目标公司Excel后立即同步读完所有竞争对手Excel，将估值数据填入竞争对比表。竞争对手PE是GRIT「估值逻辑与预测→可比公司估值对比」段落的必需数据。
 13. **阶段2完成后的自我审计** — 在进入阶段3之前，做一次全量检查：`find raw/ -type f | sort` 列出所有文件，对照每个文件名确认是否已被读取/提取/搜索。特别是：所有.xlsx → 全行读取 √；所有.pdf → pdftotext + grep关键数据 √；所有.txt/.md → read_file完整读取 √。任何未确认的文件即为遗漏。此步骤防止两次被用户指出"这个文件你还没看"。
 
@@ -497,7 +528,7 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 
 15. **🔴 PE-TTM 必须统一且自算** — 报告全文只能出现**一个**PE-TTM值，且必须由AI自行计算：`PE-TTM = 实时股价 × 总股本 ÷ (最近4个季度归母净利之和)`。①先用最新季报EPS反推总股本（总股本 = 归母净利 ÷ EPS）；②TTM净利 = 最近4个报告季的归母净利（不含非经常归属）；③二者相除得实时PE-TTM。禁止混用Wind Excel快照PE（已过期）和不同来源的PE值导致全文出现34.97/23.81/25.9三个矛盾数字。
 
-16. **🔴 「未识别」是最后手段，禁止滥用** — 遇到缺失数据时优先级：①用已有数据推算（如：期间费用率 ≈ 毛利率 − EBIT Margin）；②从券商研报提取（券商的利润表预测通常含销售/管理/研发费率明细）；③标注「推算值,置信度中」写入报告；④以上都失败才标「未识别」。本次期间费用率明明有毛利率45.07%+EBIT Margin 8.40%+信达证券Q1费率明细，却被标为「未识别」——属于明显的推算不足。
+16. **🔴 「未识别」是最后手段，禁止滥用** — 遇到缺失数据时优先级：①用已有数据推算（如：期间费用率 ≈ 毛利率 − EBIT Margin）；②从券商研报提取；③从年报正文提取（20-F Item 6=高管, Item 7=股东, Item 4=融资, F-pages=审计后BS——年报里一定有，只是你没grep到）；④标注「推算值」写入报告；⑤以上都失败才标「未识别」。FUFU分析中年报Item 6/7/4里就有前十大股东/高管履历/历史融资表格，却被标为「未识别」——典型的年报正文没读完就下结论，被老板当面指出。**核心原则：年报PDF里有的东西，pdftotext有输出就必须提取到。**
 
 17. **🔴 EPS与市值必须统一量纲** — 券商预测表常以EPS呈现，报告中必须统一转为市值（EPS × 总股本 = 净利 → 净利 × PE = 市值）。总股本获取途径：①最新季报/年报的EPS和归母净利反推（Q1 EPS 0.8796，净利4.72亿 → 5.36亿股）；②年报「股本」章节；③Wind/东方财富实时查询。统一量纲后全文才可对话比较，不应出现「这边EPS 4.92那边市值660亿」的混乱。
 
@@ -508,3 +539,64 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 ### 🔴 v1.7 新增 (2026-05-07 安克创新实战补充)
 
 20. **🔴 raw数据不足时主动调用问财API** — 当 raw/ 中缺失前十大股东/主营构成/行业数据/研报预测时，不要直接标「未识别」，应主动调用 iwencai OpenAPI 补充。可用的7个查询维度：`hithink-management-query`（股东/实控人）、`hithink-business-query`（主营/客户）、`hithink-industry-query`（行业估值/排名）、`hithink-finance-query`（财务指标）、`hithink-event-query`（重大事件）、`report-search`（研报）、`announcement-search`（公告）。API调用格式见 iwencai OpenAPI 文档（`https://openapi.iwencai.com/v1/query2data`），需要 `$IWENCAI_API_KEY` 环境变量。问财数据仅补充 raw 缺失项，不覆盖已有Excel/PDF数据。
+
+23. **🔴 SEC 20-F/10-K 文本格式陷阱** — SEC 申报文件的财务报表以文本表格形式呈现（非 HTML 表格），`grep` 难以精确提取数值。策略：①先 grep 搜索「Consolidated Statements of Operations」「Consolidated Balance Sheets」定位报表位置；②用 `grep -A200` 截取大段文本后人工/LLM 解析；③优先从6-K（季度业绩公告）的新闻稿正文获取关键财务数据（如「Total revenue was $475.8 million in 2025」），因为这些数据以叙事形式呈现更容易 grep 匹配；④20-F 的管理层讨论（MD&A）部分常直接引用财务数字，比正式报表更容易提取。关键数据获取顺序：6-K新闻稿 > 20-F MD&A > 20-F正式报表。
+
+### 🔴 v1.11 新增 (2026-05-08 FUFU 老板纠错实战)
+
+24. **🔴 上市公司年报必须提取三条"暗线"** — 见上文（已包含完整内容）。
+
+25. **🔴 股权激励章节必须达到投研深度** — 不可只写「激励池XX股，已授XX股」一句话。报告「管理层与股权结构→股权激励」段落必须包含：①激励池规模（占股本%）；②已授予/已归属/已作废分拆及作废原因；③高管各自获授股数及占总池比例；④归属条件（立即归属/阶梯归属/业绩挂钩？）及实际归属率；⑤授予日公允价值及公司已承担的SBC费用；⑥历史SBC费用对比（FY2024 vs FY2025 vs FY2023）及波动原因分析；⑦获授人是否支付对价（限制性股票通常零成本，期权需付行权价）。本次FUFU分析只写了一句「S-8注册声明」，老板追问三次才补全。
+
+26. **🔴 可推算的财务指标禁止标「待查」** — 当拥有完整BS/IS数据时，以下指标必须自行计算、填入表格、附计算过程：ROE（净利÷平均权益）、ROIC（EBIT×(1-t)÷投入资本）、PB（股价÷BVPS）、EV（市值−净现金）、EV/EBITDA、BVPS（权益÷总股本）、各项费用率（费用÷收入）。不可偷懒标「待查」。本次FUFU分析中ROE/ROIC/费用率/EV全部标「待查」，被老板指出「数据你都可以手算出来，为什么要偷懒？」——这些数据从已提取的BS/IS完全可算出。
+
+21. **🔴 扫描版 PDF 预检与 OCR 兜底流程** — 每次阶段2处理 PDF 时严格按以下顺序：
+
+    **第1步：pdftotext（始终先执行）**
+    ```bash
+    pdftotext -layout "raw/xxx.pdf" /tmp/xxx_pdftotext.txt
+    ```
+    检查输出：`wc -c /tmp/xxx_pdftotext.txt`
+
+    **第2步：判断是否需要 OCR**
+    - `pdftotext` 输出 ≥ 500 字符 → ✅ 电子版 PDF，正常 grep 搜索关键数据，跳过 OCR
+    - `pdftotext` 输出 < 500 字符或为空/乱码 → ⚠️ 扫描版 PDF，进入第3步
+
+    **第3步：OCR 兜底（仅扫描版）**
+    前提：tesseract 已安装（`which tesseract`）。如未安装，自动安装：
+    ```bash
+    sudo apt-get install -y tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-chi-tra
+    pip install pytesseract pdf2image --break-system-packages
+    ```
+    然后 OCR 提取：
+    ```python
+    from pdf2image import convert_from_path
+    import pytesseract
+    images = convert_from_path("raw/xxx.pdf", dpi=200)
+    text = "\n".join([pytesseract.image_to_string(img, lang='chi_sim+eng') for img in images])
+    with open("/tmp/xxx_ocr.txt", "w") as f: f.write(text)
+    ```
+    注意：`lang='chi_sim+eng'` 覆盖中英文；`dpi=200` 平衡速度与识别率；多页 PDF 逐页 OCR 后拼接。
+
+    **第4步：OCR 后数据提取**
+    OCR 文本可能有断行/识别错误，grep 时放宽正则（如 `grep -i '目标价.*[0-9]'` 而非精确匹配），优先提取数字而非格式。
+
+    **⚠️ 关键规则**：
+    - **电子版 PDF 绝不走 OCR** — pdftotext 输出正常时直接 grep，OCR 既慢又不准
+    - OCR 仅用于 pdftotext 失败后的兜底
+    - OCR 提取的数据在 extracted.md 中标注来源为「xxx.pdf（OCR）」
+    - 若 tesseract 安装失败或 OCR 输出质量太差，标注为「不可读」而非跳过该文件
+
+### 🔴 v2.0 新增 (2026-05-08 FUFU→skill架构升级)
+
+27. **🔴 市场检测先于一切** — 阶段0第一步（0.0）必须先判定市场：纯数字代码→A股（加载 `references/market-a-share.md`）；含字母→美股（加载 `references/market-us.md`）。判定依据：代码特征 + raw/ 文件类型。不同市场的数据源、API、提取方式完全不同——混用会导致「用东方财富 API 查美股」（失败）或「用 pdftotext grep 20-F 却不读 Item 6/7」（遗漏关键数据）。
+
+28. **🔴 美股：SEC 20-F/10-K 章节强制遍历** — 阶段2处理美股年报时，必须按 `references/market-us.md` 的「SEC章节导航表」逐章提取：Item 4.A（融资史）→ Item 5.B（流动性）→ Item 6.A（高管）→ Item 6.B（薪酬+激励）→ Item 7.A（股东）→ F-3（BS）→ F-4（IS）。禁止只 grep 财务数字就认为"年报已读完"。FUFU 分析中前十大股东和核心高管都标了"待补充"，老板质问「年报里明明有为什么不写」——就是因为没有系统遍历 SEC 章节。
+
+29. **🔴 股权激励必须写满七要素** — 「管理层与股权结构→股权激励」段落至少回答：①激励池总量及占总股本%；②已授予/归属/作废分拆及作废原因；③每位高管获授股数及占总池比例；④归属条件（立即/阶梯/业绩挂钩？）；⑤授予日公允价值及累计SBC费用；⑥SBC费用年度波动原因；⑦获授人是否支付对价。FUFU 原报告仅一行"S-8注册声明"，被老板追问三次。
+
+30. **🔴 融资历史必须是完整表格** — 资本要素分析开头必须有「历史融资路径」表，列出：SPAC合并/IPO/PIPE/增发/可转债/抵押贷款等所有融资事件，含金额、价格、日期。PIPE投资者成本 vs 现价 → 必算稀释幅度。ATM增发均价 vs PIPE价格 → 判断融资成本趋势。储架剩余空间 ÷ 现价 → 估算潜在稀释。
+
+31. **🔴 阶段2出口审计加两项** — 原有 exit audit 基础上增加：☑ 所有衍生财务指标已根据 `references/formulas.md` 自算或确认无法计算；☑ 股权激励七要素 + 历史融资表 已从年报提取完毕。
+
+22. **🔴 非 A 股实时数据源** — 当分析标的为美股（NASDAQ/NYSE）、港股或其他非 A 股时，东方财富 API（push2.eastmoney.com）不适用。改用：Yahoo Finance v8（需加 `User-Agent: Mozilla/5.0` header）、CoinGecko（加密资产价格，BTC/ETH等）、Financial Modeling Prep（demo key 可免费调用）。详见 `references/non-a-share-data-sources.md`。
