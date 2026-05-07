@@ -143,8 +143,8 @@ Agent 拿到这个 skill 后会按 6 个阶段走：
 grit-stock-analysis/
 ├── SKILL.md                                    # 主文件：Agent 行为全定义
 └── references/
-    ├── GRIT模板-...-v1.34.md                    # 研报标准模板
-    ├── HARNESS-...-v1.34.md                     # 执行框架（6阶段流水线）
+    ├── GRIT模板-...-v1.35.md                    # 研报标准模板
+    ├── HARNESS-...-v1.35.md                     # 执行框架（6阶段流水线）
     ├── wind-excel-structure.md                  # Wind Excel 行号映射（别漏关键比率）
     └── real-time-data-sources.md                # 实时股价/估值数据源
 ```
