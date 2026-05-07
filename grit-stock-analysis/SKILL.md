@@ -1,7 +1,7 @@
 ---
 name: grit-stock-analysis
 description: Execute GRIT five-factor stock research pipeline. Creates stock folder, guides user through manual raw data collection, then runs the full HARNESS framework to produce a complete investment research report. Trigger when user requests stock analysis, asks to "跑一下GRIT", or mentions a stock they want to research.
-version: 2.0
+version: 2.2
 ---
 
 # GRIT 五要素股票研究 Skill
