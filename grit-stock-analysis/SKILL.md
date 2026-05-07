@@ -46,7 +46,7 @@ Skill 内部已含核心文件（无需额外加载）：
 #### 0.1 创建项目文件夹
 
 ```
-~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/
+~/grit/analysis/{股票名称}（{股票代码}）/
 ├── raw/           ← 用户手动放置原始资料
 ├── extracted.md   ← 阶段3产出：结构化素材
 ├── report.md      ← 阶段5产出：最终报告
@@ -55,7 +55,7 @@ Skill 内部已含核心文件（无需额外加载）：
 
 **代码模板**：
 ```bash
-mkdir -p "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw"
+mkdir -p "~/grit/analysis/{股票名称}（{股票代码}）/raw"
 ```
 
 #### 0.2 输出资料收集指引
@@ -79,7 +79,7 @@ mkdir -p "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw"
 | 🔵 加分 | 公司公告（重大合同/定增/股权激励等） | 巨潮资讯网 |
 
 ### 操作步骤
-1. 打开文件夹：`~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/`
+1. 打开文件夹：`~/grit/analysis/{股票名称}（{股票代码}）/raw/`
 2. 把下载好的文件全部扔进去（可按类型建子目录组织，如 `券商研报/`、`年报/`、`高临纪要/`、`财报/`，任意结构均可）
 3. 回来告诉我「资料已放好，开始分析」
 
@@ -102,7 +102,7 @@ mkdir -p "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw"
 #### 1.1 扫描 raw 文件夹
 
 ```bash
-find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
+find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 ```
 
 列出所有文件：文件名、类型（Excel/PDF/其他）、大小。
@@ -211,7 +211,7 @@ find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -typ
 | 最新研报标题/评级 | `report-search` | 估值素材→券商预测 |
 | 最新公告（季报/年报等） | `announcement-search` | 提示用户下载PDF放入raw/ |
 
-**调用格式**：直接 curl POST `https://openapi.iwencai.com/v1/query2data`，具体见 `iwencai-setup` skill。
+**调用格式**：直接 curl POST `https://openapi.iwencai.com/v1/query2data`（需要 `$IWENCAI_API_KEY` 环境变量）。如果你的 agent 有专门的 iwencai skill，优先使用 skill 内置的调用方式。
 
 > ⚠️ 问财数据**仅作为补充**，不覆盖 raw/ 中已有的 Excel/年报/研报数据。财务数据的优先级：Excel > 年报PDF > 问财API。
 
@@ -437,7 +437,7 @@ find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -typ
 ## 最终产出
 
 ```
-~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/
+~/grit/analysis/{股票名称}（{股票代码}）/
 ├── raw/                 ← 原始资料
 ├── extracted.md         ← 结构化素材（含跨引用索引）
 ├── report.md            ← 完整报告（GRIT模板格式）
@@ -507,4 +507,4 @@ find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -typ
 
 ### 🔴 v1.7 新增 (2026-05-07 安克创新实战补充)
 
-20. **🔴 raw数据不足时主动调用问财API** — 当 raw/ 中缺失前十大股东/主营构成/行业数据/研报预测时，不要直接标「未识别」，应主动调用 iwencai OpenAPI 补充。可用的7个查询维度：`hithink-management-query`（股东/实控人）、`hithink-business-query`（主营/客户）、`hithink-industry-query`（行业估值/排名）、`hithink-finance-query`（财务指标）、`hithink-event-query`（重大事件）、`report-search`（研报）、`announcement-search`（公告）。API调用格式见 `iwencai-setup` skill。问财数据仅补充 raw 缺失项，不覆盖已有Excel/PDF数据。
+20. **🔴 raw数据不足时主动调用问财API** — 当 raw/ 中缺失前十大股东/主营构成/行业数据/研报预测时，不要直接标「未识别」，应主动调用 iwencai OpenAPI 补充。可用的7个查询维度：`hithink-management-query`（股东/实控人）、`hithink-business-query`（主营/客户）、`hithink-industry-query`（行业估值/排名）、`hithink-finance-query`（财务指标）、`hithink-event-query`（重大事件）、`report-search`（研报）、`announcement-search`（公告）。API调用格式见 iwencai OpenAPI 文档（`https://openapi.iwencai.com/v1/query2data`），需要 `$IWENCAI_API_KEY` 环境变量。问财数据仅补充 raw 缺失项，不覆盖已有Excel/PDF数据。
