@@ -1,7 +1,7 @@
 ---
 name: grit-stock-analysis
 description: Execute GRIT five-factor stock research pipeline. Creates stock folder, guides user through manual raw data collection, then runs the full HARNESS framework to produce a complete investment research report. Trigger when user requests stock analysis, asks to "跑一下GRIT", or mentions a stock they want to research.
-version: 1.6
+version: 1.7
 ---
 
 # GRIT 五要素股票研究 Skill
@@ -196,6 +196,29 @@ find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -typ
 **维度三：缺口二次确认**
 
 扫描完成后对照信息需求清单再次输出覆盖状态，发现新的缺口及时询问用户。
+
+**维度四：问财 API 补充（当 raw 数据不足时）**
+
+> 如果 agent 环境已配置 iwencai API（`$IWENCAI_API_KEY`），在以下场景主动调用问财 OpenAPI 补充数据：
+
+| 缺失数据 | 调用 Skill | 填充板块 |
+|---------|-----------|---------|
+| 前十大股东/实控人/股权结构 | `hithink-management-query` | 管理层与股权结构 |
+| 主营构成/客户/供应商 | `hithink-business-query` | 公司业务→产品画像/客户分析 |
+| 行业估值/排名/增速 | `hithink-industry-query` | 行业素材→规模与增速 |
+| 财务指标补充（ROE/负债率等） | `hithink-finance-query` | 财务素材→核心指标 |
+| 业绩预告/重大事件 | `hithink-event-query` | 风险素材→事件风险 |
+| 最新研报标题/评级 | `report-search` | 估值素材→券商预测 |
+| 最新公告（季报/年报等） | `announcement-search` | 提示用户下载PDF放入raw/ |
+
+**调用格式**：直接 curl POST `https://openapi.iwencai.com/v1/query2data`，具体见 `iwencai-setup` skill。
+
+> ⚠️ 问财数据**仅作为补充**，不覆盖 raw/ 中已有的 Excel/年报/研报数据。财务数据的优先级：Excel > 年报PDF > 问财API。
+
+**实时行情抓取时机**：
+- **阶段2开始时**：抓取一次（股价/市值/PE-TTM/涨跌幅），作为后续分析的基准
+- **阶段4（估值分析前）**：再次抓取，确保估值基于最新行情
+- 使用东方财富API（`push2.eastmoney.com`），见 `references/real-time-data-sources.md`
 
 ---
 
@@ -466,3 +489,7 @@ find "~/.hermes/data/grit/analysis/{股票名称}（{股票代码}）/raw/" -typ
 18. **🔴 增长类型判定必须全量罗列** — 营收增长类型共10种（环比增长型/同比增长型/稳定型/趋势增长型/快速增长型/混合型/减速增长/加速增长/下滑型/剧烈波动型），盈利匹配共5种。**必须全部列出，仅在匹配的打✅，不匹配的保留不打勾**。这方便阅读者全面审视，避免因AI自行筛选而遗漏重要信号。
 
 19. **🔴 季度财务追踪必须含最近报告期** — 季度表必须覆盖所有可用的报告季度。若raw中存在最新季报（如2026Q1），必须纳入，不得停留在上一个完整年度。每个季度至少8列（2年×4季=8），有新数据则扩展至9列+。
+
+### 🔴 v1.7 新增 (2026-05-07 安克创新实战补充)
+
+20. **🔴 raw数据不足时主动调用问财API** — 当 raw/ 中缺失前十大股东/主营构成/行业数据/研报预测时，不要直接标「未识别」，应主动调用 iwencai OpenAPI 补充。可用的7个查询维度：`hithink-management-query`（股东/实控人）、`hithink-business-query`（主营/客户）、`hithink-industry-query`（行业估值/排名）、`hithink-finance-query`（财务指标）、`hithink-event-query`（重大事件）、`report-search`（研报）、`announcement-search`（公告）。API调用格式见 `iwencai-setup` skill。问财数据仅补充 raw 缺失项，不覆盖已有Excel/PDF数据。
