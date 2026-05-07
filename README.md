@@ -57,9 +57,33 @@ grit-stock-analysis/
 
 ---
 
-## 用户使用方式
+## 安装
 
-1. 将标的的原始资料（年报 PDF、财务 Excel、券商研报、调研纪要等）放入 `raw/` 文件夹
+GRIT 不依赖任何特定 Agent——**它就是一堆 Markdown 文件**。放到你 AI Agent 加载 skills / context documents 的目录下即可。
+
+常见的 Agent 对应路径：
+
+| Agent | 放置位置 |
+|:---|:---|
+| Hermes | `~/.hermes/skills/research/grit-stock-analysis/` |
+| OpenClaw | 项目根目录或自定义 skills 文件夹 |
+| Claude Code | 项目 `.claude/commands/` 或通过 CLAUDE.md 引用 |
+| Cursor | 项目根目录，通过 `.cursorrules` 引用 |
+| 其他 | 任何 Agent 能读取到的路径即可 |
+
+下载方式二选一：
+
+```bash
+# 方式一：从 GitHub Releases 下载 ZIP
+# 解压后将 grit-stock-analysis/ 放到你的 Agent skills 目录
+
+# 方式二：git clone（推荐，方便后续更新）
+git clone https://github.com/panfeng0806/grit-stock-analysis.git /你的/skills/目录/grit-stock-analysis
+```
+
+## 使用方式
+
+1. 将标的原始资料（年报 PDF、财务 Excel、券商研报、调研纪要等）放入 `raw/` 文件夹
 2. 对 Agent 说：「分析一下 XXX（代码 XXX）」
 3. Agent 自动执行六阶段流程，产出结构化素材 + 完整报告 + 数据来源清单
 
