@@ -22,8 +22,7 @@ version: 2.0
 
 Skill 内部已含核心文件（无需额外加载）：
 - `references/GRIT模板-五要素股票AI研究提示词-v1.35.md` — 报告模板
-- `references/wind-excel-structure.md` — Wind/Choice Excel行区块结构
-- `references/non-a-share-data-sources.md` — 非A股实时数据源
+- `references/real-time-data-sources.md` — 全市场实时数据源（A股/美股/加密）
 - `references/market-a-share.md` — **A股市场参考**（数据源/Excel结构/问财API）
 - `references/market-us.md` — **美股市场参考**（SEC章节导航/20-F提取/Yahoo Finance）
 - `references/formulas.md` — **衍生指标自动计算公式**（消灭"待查"）
@@ -622,4 +621,4 @@ find "~/grit/analysis/{股票名称}（{股票代码}）/raw/" -type f | sort
 
 31. **🔴 阶段2出口审计加两项** — 原有 exit audit 基础上增加：☑ 所有衍生财务指标已根据 `references/formulas.md` 自算或确认无法计算；☑ 股权激励七要素 + 历史融资表 已从年报提取完毕。
 
-22. **🔴 非 A 股实时数据源** — 当分析标的为美股（NASDAQ/NYSE）、港股或其他非 A 股时，东方财富 API（push2.eastmoney.com）不适用。改用：Yahoo Finance v8（需加 `User-Agent: Mozilla/5.0` header）、CoinGecko（加密资产价格，BTC/ETH等）、Financial Modeling Prep（demo key 可免费调用）。详见 `references/non-a-share-data-sources.md`。
+22. **🔴 非 A 股实时数据源** — 当分析标的为美股（NASDAQ/NYSE）、港股或其他非 A 股时，东方财富 API 不适用。改用：Yahoo Finance v8（需加 `User-Agent: Mozilla/5.0` header）、CoinGecko（加密资产价格，BTC/ETH等）、Financial Modeling Prep（demo key 可免费调用）。详见 `references/real-time-data-sources.md`。

@@ -1,65 +1,75 @@
-# Real-Time Market Data Sources
+# 实时数据源 — 全市场
 
-Quick-reference for fetching live A-share stock prices, used in Phase 2/3 of GRIT analysis.
+GRIT 阶段2/3 抓取实时股价、市值、加密资产价格。
 
-## A-Share Stocks (沪深)
+---
 
-### East Money API (东方财富) — Primary
+## A 股（沪深）
 
-```python
-import urllib.request, json
-
-# SECID format: 0.{code} for SZ, 1.{code} for SH
-url = 'https://push2.eastmoney.com/api/qt/stock/get?secid=0.300866&fields=f43,f44,f45,f46,f47,f48,f50,f51,f52,f55,f57,f58,f60,f116,f117,f162,f167,f168,f169,f170,f171'
-req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-with urllib.request.urlopen(req, timeout=10) as resp:
-    d = json.loads(resp.read())['data']
-    price = d.get('f43') / 100          # 最新价(元)
-    prev_close = d.get('f60') / 100      # 昨收
-    change_pct = d.get('f169') / 100     # 涨跌幅(%)
-    mkt_cap = d.get('f116') / 1e8        # 总市值(亿)
-    pe_ttm = d.get('f162') / 100         # PE-TTM
-    pb = d.get('f167') / 100             # PB
-    high_52w = d.get('f51') / 100        # 52周最高
-    low_52w = d.get('f52') / 100         # 52周最低
-```
-
-**Key fields:**
-| Field | Meaning | Unit |
-|:---|:---|:---|
-| f43 | 最新价 | 分(÷100=元) |
-| f58 | 股票名称 | str |
-| f60 | 昨收 | 分 |
-| f116 | 总市值 | 元(÷1e8=亿) |
-| f117 | 流通市值 | 元 |
-| f162 | PE-TTM | ×100 |
-| f167 | PB | ×100 |
-| f169 | 涨跌幅 | ×100 |
-| f170 | 5日涨跌幅 | ×100 |
-| f171 | 20日涨跌幅 | ×100 |
-
-**Note:** The historical K-line endpoint (`push2his.eastmoney.com`) may be blocked or throttle connections. Use the basic quote endpoint above for real-time snapshots — it's more reliable.
-
-### One-liner Shell
+### 东方财富 API — 主力
 
 ```bash
 python3 -c "
 import urllib.request, json
-url='https://push2.eastmoney.com/api/qt/stock/get?secid=0.300866&fields=f43,f58,f116,f162,f167'
+url='https://push2.eastmoney.com/api/qt/stock/get?secid=0.300866&fields=f43,f58,f116,f162,f167,f169'
 req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
 d=json.loads(urllib.request.urlopen(req,timeout=10).read())['data']
 print(f'{d[\"f58\"]}: {d[\"f43\"]/100}元 | PE:{d[\"f162\"]/100:.1f} | PB:{d[\"f167\"]/100:.2f} | 市值:{d[\"f116\"]/1e8:.0f}亿')
 "
 ```
 
-## US Stocks (美股) — placeholder
+**字段**：f43=最新价(÷100) | f58=名称 | f116=总市值(÷1e8=亿) | f162=PE-TTM(÷100) | f167=PB(÷100) | f169=涨跌幅(÷100)
 
-For future use; not yet validated in GRIT sessions.
-
-## HK Stocks (港股) — placeholder
-
-For future use; not yet validated in GRIT sessions.
+secid: `0.{code}` 深市, `1.{code}` 沪市
 
 ---
 
-> **Usage in GRIT**: Call the one-liner during Phase 2 or 3 to populate the 估值素材 section. Do NOT use stale prices from raw/ PDFs or Excel files — market data must be real-time at analysis time.
+## 美股（NYSE / NASDAQ）
+
+### Yahoo Finance v8 — 主力
+
+```bash
+curl -s -H "User-Agent: Mozilla/5.0" \
+  "https://query1.finance.yahoo.com/v8/finance/chart/FUFU?interval=1d&range=5d" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin)['chart']['result'][0]['meta']; print(f'{d[\"regularMarketPrice\"]} | prev:{d[\"previousClose\"]}')"
+```
+
+⚠️ 必须加 `User-Agent`，否则部分 ticker 返回空。
+
+### Financial Modeling Prep（兜底）
+
+```bash
+curl -s "https://financialmodelingprep.com/api/v3/quote/FUFU?apikey=demo"
+```
+
+免费 tier，`apikey=demo` 可偶尔使用。返回 price, marketCap, sharesOutstanding 一步到位。
+
+### 用户 CSV
+
+若 raw/ 中有 `股价走势.csv`（Date,Close,High,Low,Volume），取最后一行为现价——最可靠。
+
+---
+
+## 加密资产
+
+### CoinGecko（免费，无需 API key）
+
+```bash
+curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+```
+
+支持 BTC/ETH/1000+ 币种。免费 tier 约 10-30 次/分钟。挖矿股（FUFU/MARA/RIOT 等）必须抓 BTC 现价。
+
+---
+
+## 港股（预留）
+
+港交所 API / Yahoo Finance `.HK` 后缀。待验证。
+
+---
+
+## 使用规则
+
+- **阶段2开始时** + **阶段4估值分析前** 各抓一次，确保估值基于最新行情
+- 股价/PE/市值禁止用 raw 中 PDF/Excel 的历史数据
+- 抓取失败则标注「数据源不可用」，而非编造
