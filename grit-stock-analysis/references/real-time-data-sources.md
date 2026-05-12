@@ -24,29 +24,47 @@ secid: `0.{code}` 深市, `1.{code}` 沪市
 
 ---
 
-## 美股（NYSE / NASDAQ）
+## 美股（NYSE / NASDAQ）& 港股
 
-### Yahoo Finance v8 — 主力
+### Yahoo Finance v8 chart — 主力 ✅ 已验证 2026-05-12
 
+**美股**：
 ```bash
-curl -s -H "User-Agent: Mozilla/5.0" \
-  "https://query1.finance.yahoo.com/v8/finance/chart/FUFU?interval=1d&range=5d" \
-  | python3 -c "import json,sys; d=json.load(sys.stdin)['chart']['result'][0]['meta']; print(f'{d[\"regularMarketPrice\"]} | prev:{d[\"previousClose\"]}')"
+curl -sL -H "User-Agent: Mozilla/5.0" \
+  "https://query1.finance.yahoo.com/v8/finance/chart/CRCL?interval=1d&range=1mo" \
+  | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['chart']['result'][0]
+m=d['meta']
+q=d['indicators']['quote'][0]
+print(f'股价: \${m[\"regularMarketPrice\"]} | 52W高: \${m.get(\"fiftyTwoWeekHigh\",\"?\")} | 52W低: \${m.get(\"fiftyTwoWeekLow\",\"?\")} | 币种: {m[\"currency\"]}')
+"
 ```
 
-⚠️ 必须加 `User-Agent`，否则部分 ticker 返回空。
-
-### Financial Modeling Prep（兜底）
-
+**港股**（⚠️ 去掉前导零：09961.HK→9961.HK）：
 ```bash
-curl -s "https://financialmodelingprep.com/api/v3/quote/FUFU?apikey=demo"
+curl -sL -H "User-Agent: Mozilla/5.0" \
+  "https://query1.finance.yahoo.com/v8/finance/chart/9961.HK?interval=1d&range=3mo"
 ```
 
-免费 tier，`apikey=demo` 可偶尔使用。返回 price, marketCap, sharesOutstanding 一步到位。
+> ✅ **已多ticker验证**（CRCL/AAPL/TSLA/PYPL）均可正常返回。chart端点只返回股价/OHLCV/52周高低，**不返回市值/PE/EPS**。quoteSummary端点仍被封（需cookie）。PE/市值必须自算。
 
-### 用户 CSV
+### PE/市值自算（替代quoteSummary）
 
-若 raw/ 中有 `股价走势.csv`（Date,Close,High,Low,Volume），取最后一行为现价——最可靠。
+```
+1. 股价 = chart端点 regularMarketPrice
+2. 总股本 = 归母净利 ÷ EPS（从Wind Excel同一报告期）
+3. 市值 = 股价 × 总股本  
+4. PE-TTM = 市值 ÷ TTM归母净利（最近4个季度之和）
+```
+
+### Financial Modeling Prep（兜底，免费tier 250次/天）
+
+```bash
+curl -s "https://financialmodelingprep.com/api/v3/quote/CRCL?apikey=demo"
+```
+
+> 返回 price, marketCap, sharesOutstanding 一步到位。仅限美股。demo key 有限额，适用于 raw 数据缺失时兜底。
 
 ---
 
@@ -62,9 +80,14 @@ curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies
 
 ---
 
-## 港股（预留）
+## 港股
 
-港交所 API / Yahoo Finance `.HK` 后缀。待验证。
+详见 `references/market-hk.md` + `references/yahoo-finance-pitfalls.md`。
+
+核心要点：
+- Yahoo Finance代码**去掉前导零**（09961.HK → 9961.HK）
+- quoteSummary不可用，PE/市值自算
+- Wind Excel底部有币种标注行（显示HKD/原始CNY/转换汇率）
 
 ---
 
