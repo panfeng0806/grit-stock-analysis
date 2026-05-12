@@ -1,4 +1,4 @@
-# 港股市场参考（携程09961.HK v2.3实战提炼）
+# 港股市场参考（v2.3实战提炼）
 
 ## 港股年报结构
 
@@ -12,14 +12,14 @@
 | 財務報表附註 | F-pages | 审计后BS/IS/CF + 详细附注 | pdftotext后定位 |
 | 管理層討論與分析 | MD&A | 业务回顾/风险/前景 | 全文浏览 |
 
-## 双上市处理（如09961.HK + TCOM.US）
+## 双上市处理（如 0000.HK + TICKR.US）
 
 **核心原则：港股年报章节=20-F结构，分析港股时不需要额外拿SEC 20-F，两者内容重复。**
 
 | 场景 | 处理方式 |
 |:---|:---|
-| 用户明确说"分析港股09961" | 仅用港股年报，不取20-F |
-| 用户明确说"分析美股TCOM" | 用20-F（按market-us.md流程） |
+| 用户明确说"分析港股0000" | 仅用港股年报，不取20-F |
+| 用户明确说"分析美股TICKR" | 用20-F（按market-us.md流程） |
 | 用户要求双市场对比 | 港股年报为主，20-F仅用于交叉验证 |
 
 ## 实时行情
@@ -29,16 +29,16 @@
 **关键：港股代码去前导零！**
 
 ```
-✅ 9961.HK  — 正确
-❌ 09961.HK — 错误（返回"symbol may be delisted"）
-✅ 0780.HK  — 同程旅行
+✅ 0000.HK  — 正确
+❌ 00000.HK — 错误（返回"symbol may be delisted"）
+✅ 0005.HK  — 汇丰控股
 ```
 
 ### 获取行情
 
 ```bash
 # chart端点（可用，不需cookie）
-curl -sL "https://query1.finance.yahoo.com/v8/finance/chart/9961.HK?interval=1d&range=1mo" \
+curl -sL "https://query1.finance.yahoo.com/v8/finance/chart/0000.HK?interval=1d&range=1mo" \
   -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
 # quoteSummary端点（被Yahoo封禁，需cookie）
@@ -64,7 +64,7 @@ curl -sL "https://query1.finance.yahoo.com/v8/finance/chart/9961.HK?interval=1d&
 
 ### 主营构成「地区100%中国大陆」陷阱
 
-对于国际业务公司（如携程、安克），Wind主营构成的地区分类往往全部标为"中国大陆100%"。**这不是数据错误，而是Wind分类方式导致**——必须从年报/研报提取国际收入占比补充。
+对于国际业务公司，Wind主营构成的地区分类往往全部标为"中国大陆100%"。**这不是数据错误，而是Wind分类方式导致**——必须从年报/研报提取国际收入占比补充。
 
 ### 竞争对手Excel
 
