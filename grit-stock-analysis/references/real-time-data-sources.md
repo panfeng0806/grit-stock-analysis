@@ -47,24 +47,64 @@ curl -sL -H "User-Agent: Mozilla/5.0" \
   "https://query1.finance.yahoo.com/v8/finance/chart/9961.HK?interval=1d&range=3mo"
 ```
 
-> ✅ **已多ticker验证**（CRCL/AAPL/TSLA/PYPL）均可正常返回。chart端点只返回股价/OHLCV/52周高低，**不返回市值/PE/EPS**。quoteSummary端点仍被封（需cookie）。PE/市值必须自算。
+> ✅ **已多ticker验证**（CRCL/AAPL/TSLA/PYPL）均可正常返回。
 
-### PE/市值自算（替代quoteSummary）
+### Yahoo Finance 端点状态
 
+| 端点 | 状态 | 返回内容 |
+|:---|:---|:---|
+| `v8/finance/chart` | ✅ 可用 | 股价(regularMarketPrice)、OHLCV、52周高低、时间戳 |
+| `v10/finance/quoteSummary` | ❌ 封禁 | Unauthorized / Invalid Crumb（需cookie+crumb） |
+| `v7/finance/quote` | ❌ 封禁 | 同上 |
+
+### chart 端点不返回的数据（必须自算）
+
+chart端点 **不返回**：marketCap、trailingPE、forwardPE、sharesOutstanding、bookValue、EPS。
+
+**自算方案**：
 ```
 1. 股价 = chart端点 regularMarketPrice
 2. 总股本 = 归母净利 ÷ EPS（从Wind Excel同一报告期）
-3. 市值 = 股价 × 总股本  
+3. 市值 = 股价 × 总股本
 4. PE-TTM = 市值 ÷ TTM归母净利（最近4个季度之和）
+5. PB = 股价 ÷ (股东权益 ÷ 总股本)
 ```
+
+### 港股代码格式陷阱
+
+Yahoo Finance 对港股代码**去掉前导零**：
+```
+✅ 9961.HK   — 正确
+❌ 09961.HK  — 返回 "No data found, symbol may be delisted"
+✅ 0780.HK   — 同程旅行
+```
+
+**规则**：所有港股Yahoo查询一律去掉前导零。
+
+### Python 解析常见错误
+
+| 错误 | 原因 | 修复 |
+|:---|:---|:---|
+| `TypeError: 'NoneType' object is not subscriptable` | `d['chart']['result']` 为None | 先检查 `d['chart'].get('error')` |
+| `TypeError: the JSON object must be str...` | 用了`json.load(sys.stdin)`而非`json.loads(sys.stdin.read())` | 用`json.loads(sys.stdin.read())` |
+| `KeyError: 'regularMarketPrice'` | 用了quoteSummary端点而非chart端点 | 切换到v8/finance/chart |
 
 ### Financial Modeling Prep（兜底，免费tier 250次/天）
 
 ```bash
-curl -s "https://financialmodelingprep.com/api/v3/quote/CRCL?apikey=demo"
+curl -s "https://financialmodelingprep.com/api/v3/quote/CRCL?apikey=***"
 ```
 
-> 返回 price, marketCap, sharesOutstanding 一步到位。仅限美股。demo key 有限额，适用于 raw 数据缺失时兜底。
+> 返回 price, marketCap, sharesOutstanding 一步到位。仅限美股。demo key 有限额。
+
+---
+
+## 备用数据源（Yahoo 彻底不可用时）
+
+- **美股**：Financial Modeling Prep (demo key可用)
+- **加密**：CoinGecko API
+- **A股**：东方财富 push2.eastmoney.com
+- **港股**：暂无可靠免费备用源，建议用 CDP 浏览器抓取 Google Finance 或 AAStocks
 
 ---
 
@@ -80,19 +120,8 @@ curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies
 
 ---
 
-## 港股
-
-详见 `references/market-hk.md` + `references/yahoo-finance-pitfalls.md`。
-
-核心要点：
-- Yahoo Finance代码**去掉前导零**（09961.HK → 9961.HK）
-- quoteSummary不可用，PE/市值自算
-- Wind Excel底部有币种标注行（显示HKD/原始CNY/转换汇率）
-
----
-
 ## 使用规则
 
-- **阶段2开始时** + **阶段4估值分析前** 各抓一次，确保估值基于最新行情
+- **阶段2开始时** + **阶段5估值分析前** 各抓一次，确保估值基于最新行情
 - 股价/PE/市值禁止用 raw 中 PDF/Excel 的历史数据
 - 抓取失败则标注「数据源不可用」，而非编造
